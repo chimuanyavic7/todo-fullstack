@@ -1,0 +1,72 @@
+version: "3.9"
+
+services:
+
+  mongodb:
+    image: mongo:7.0
+    container_name: mongodb
+    restart: unless-stopped
+
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+
+    volumes:
+      - mongo_data:/data/db
+
+    networks:
+      - todo-network
+
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    image: chimuanyavic7/backend-todo:v1
+    container_name: todo-backend
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    environment:
+      MONGO_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongodb:27017/${MONGO_DATABASE}?authSource=admin
+
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+    ports:
+      - "${BACKEND_PORT}:3000"
+
+    networks:
+      - todo-network
+
+  frontend:
+    image: chimuanyavic7/frontend-todo:v1
+
+    container_name: todo-frontend
+    restart: unless-stopped
+
+    depends_on:
+      - backend
+
+    environment:
+      - REACT_APP_API_URL=http://backend:3000/api  
+
+    ports:
+      - "${FRONTEND_PORT}:80"
+
+    networks:
+      - todo-network
+
+
+volumes:
+  mongo-data:
+    driver: local
+
+networks:
+  todo-network:
+    driver: bridge
